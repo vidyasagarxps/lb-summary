@@ -28,6 +28,7 @@
   #summaryText strong { color: #1b2a4a; }
   #summaryText p { margin: 4px 0; }
   #summaryText h3 { font-size: 13px; margin: 10px 0 4px; color: #1b2a4a; }
+  .date-badge { display: inline-block; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 4px 12px; border-radius: 4px; font-size: 11px; margin: 8px 20px; }
   .loading { display: flex; align-items: center; gap: 10px; color: #94a3b8; padding: 24px 20px; }
   .spinner { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -53,17 +54,17 @@
   </div>
 </div>
 
+<div id="dateBadge"></div>
 <div id="summaryText"></div>
 
 <script>
-const SNOWFLAKE_URL = "https://ARXPS-XPANSE.snowflakecomputing.com";
-const AGENT_PATH = "/api/v2/databases/XPS_AID/schemas/LOAN_BOARDING/agents/LB_PBI_AGENT:run";
-const PAT = 'eyJraWQiOiI5MzcyNjA2OTQ3MzU5NTQiLCJhbGciOiJFUzI1NiJ9.eyJwIjoiMTQzMDE0NjUwMTM6MTQzMDE0NjY3NTciLCJpc3MiOiJTRjoxMDQzIiwiZXhwIjoxNzgxMTE4MjQ3fQ.JbOjs_9FuHuB7AfTbAgtcQAgx_tAfm5JYI2UvF-X0ggKcBC0Hi3F12eS-wF31jobIcXYeZETIlstNPKybOAKjA';
+var SNOWFLAKE_URL = "https://ARXPS-XPANSE.snowflakecomputing.com";
+var AGENT_PATH = "/api/v2/databases/XPS_AID/schemas/LOAN_BOARDING/agents/LB_PBI_AGENT:run";
+var PAT = 'eyJraWQiOiI5MzcyNjA2OTQ3MzU5NTQiLCJhbGciOiJFUzI1NiJ9.eyJwIjoiMTQzMDE0NjUwMTM6MTQzMDE0NjY3NTciLCJpc3MiOiJTRjoxMDQzIiwiZXhwIjoxNzgxMTE4MjQ3fQ.JbOjs_9FuHuB7AfTbAgtcQAgx_tAfm5JYI2UvF-X0ggKcBC0Hi3F12eS-wF31jobIcXYeZETIlstNPKybOAKjA'
 
-const SUMMARY_PROMPT = " \u2014 Provide only a brief business summary in 3-5 sentences. No tables, no raw data, no detailed breakdowns, no SQL. Just a high-level narrative paragraph.";
 
-const QUERIES = {
-  exec_summary:  { label: "Executive Summary",              question: "Generate executive insights and action items summarizing all loan boarding dashboard KPIs" },
+var QUERIES = {
+  exec_summary:  { label: "Executive Summary",              question: "Executive Summary" },
   doc_class:     { label: "Document Classification Summary", question: "Document Classification Summary" },
   field_extract: { label: "Field Extraction Summary",        question: "Field Extraction Summary" },
   rule_eval:     { label: "Rule Evaluation Summary",         question: "Rule Evaluation Summary" },
@@ -74,6 +75,16 @@ const QUERIES = {
 var params = new URLSearchParams(window.location.search);
 var isDev = params.get('mode') === 'dev';
 var queryId = params.get('q');
+var startDate = params.get('start') || '';
+var endDate = params.get('end') || '';
+
+var DATE_FILTER = '';
+if (startDate && endDate) {
+  DATE_FILTER = " for the period from " + startDate + " to " + endDate;
+  document.getElementById('dateBadge').innerHTML = '<span class="date-badge">Filtering: ' + startDate + ' to ' + endDate + '</span>';
+}
+
+var SUMMARY_PROMPT = DATE_FILTER + " — Provide only a brief business summary in 3-5 sentences. No tables, no raw data, no detailed breakdowns, no SQL. Just a high-level narrative paragraph.";
 
 (function init() {
   if (isDev) {
