@@ -6,23 +6,22 @@
 <title>Loan Boarding Summary</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; height: 100%; width: 100%; overflow-x: hidden; overflow-y: auto; }
-  .wrapper { display: flex; flex-direction: column; min-height: 100%; width: 100%; padding: 16px; }
-  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px; flex: 1; display: flex; flex-direction: column; }
-  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-shrink: 0; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; }
-  .card-title { font-size: 18px; font-weight: 700; color: #111; text-transform: uppercase; letter-spacing: 0.5px; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; height: 100%; width: 100%; overflow: hidden; }
+  .wrapper { display: flex; flex-direction: column; height: 100%; width: 100%; padding: 12px; }
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 18px; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-shrink: 0; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+  .card-title { font-size: 12px; font-weight: 700; color: #111; text-transform: uppercase; letter-spacing: 0.5px; }
   .card ul { list-style: none; padding: 0; flex: 1; }
-  .card li { font-size: 15px; line-height: 1.9; color: #333; padding: 14px 0; border-bottom: 1px solid #f3f4f6; display: flex; gap: 12px; }
+  .card li { font-size: 11px; line-height: 1.7; color: #444; padding: 8px 0; border-bottom: 1px solid #f3f4f6; display: flex; gap: 8px; }
   .card li:last-child { border-bottom: none; }
-  .bullet { flex-shrink: 0; margin-top: 4px; font-size: 11px; }
+  .bullet { flex-shrink: 0; margin-top: 2px; font-size: 8px; }
   .bullet-insights { color: #2563eb; }
   .bullet-risks { color: #d97706; }
   .bullet-actions { color: #059669; }
-  .loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: #999; min-height: 200px; font-size: 15px; }
-  .spinner { width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: #999; flex: 1; font-size: 13px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .error-text { color: #dc2626; padding: 24px; font-size: 14px; }
-  .empty-section { padding: 24px; color: #999; font-size: 14px; }
+  .error-text { color: #dc2626; padding: 24px 20px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -34,12 +33,12 @@ var PAT = 'eyJraWQiOiI5MzcyNjA2OTQ3MzU5NTQiLCJhbGciOiJFUzI1NiJ9.eyJwIjoiMTQzMDE0
 
 
 var QUERIES = {
-  exec_summary:  { question: "Executive Summary" },
-  doc_class:     { question: "Document Classification Summary" },
-  field_extract: { question: "Field Extraction Summary" },
-  rule_eval:     { question: "Rule Evaluation Summary" },
-  hil:           { question: "Human in Loop Summary" },
-  proc_time:     { question: "Processing Time Breakdown" }
+  exec_summary:  { label: "Executive Summary",              question: "Executive Summary" },
+  doc_class:     { label: "Document Classification Summary", question: "Document Classification Summary" },
+  field_extract: { label: "Field Extraction Summary",        question: "Field Extraction Summary" },
+  rule_eval:     { label: "Rule Evaluation Summary",         question: "Rule Evaluation Summary" },
+  hil:           { label: "Human in Loop Summary",           question: "Human in Loop Summary" },
+  proc_time:     { label: "Processing Time Breakdown",       question: "Processing Time Breakdown" }
 };
 
 var SECTION_CONFIG = {
@@ -54,118 +53,66 @@ var section = params.get('section') || 'insights';
 var startDate = params.get('start') || '';
 var endDate = params.get('end') || '';
 
-var CACHE_KEY = 'lb_' + queryId + '_' + startDate + '_' + endDate;
-
 var DATE_FILTER = '';
 if (startDate && endDate) {
   DATE_FILTER = " for the period from " + startDate + " to " + endDate;
 }
 
-var SUMMARY_PROMPT = DATE_FILTER + " — Reply ONLY with JSON, no other text: {\"insights\":[\"...\",\"...\",\"...\"],\"risks\":[\"...\",\"...\",\"...\"],\"actions\":[\"...\",\"...\",\"...\"]}. Each bullet: BoldLabel: detail with metrics. 3 per section. No markdown, no SQL.";
+var SUMMARY_PROMPT = DATE_FILTER + " — Respond in EXACTLY this JSON format with no other text: {\"insights\": [\"insight 1\", \"insight 2\", \"insight 3\"], \"risks\": [\"risk 1\", \"risk 2\", \"risk 3\"], \"actions\": [\"action 1\", \"action 2\", \"action 3\"]}. IMPORTANT: Each bullet must start with a bold label followed by a colon and a detailed explanation with specific numbers, percentages, and metrics from the data. Example: 'Turnaround Time: Fell to 92% from 99% SLA, with document processing delays increasing by 15% across the pipeline.' Each array must have exactly 3 detailed, metric-driven bullet points. No markdown, no SQL, no tables.";
 
 if (queryId && QUERIES[queryId]) {
-  loadSection();
+  runQuery(queryId);
 } else {
   document.getElementById('summaryText').innerHTML = '<div class="loading">No query configured.</div>';
 }
 
-async function loadSection() {
+async function runQuery(id) {
+  var q = QUERIES[id];
   var el = document.getElementById('summaryText');
-
-  var cached = sessionStorage.getItem(CACHE_KEY);
-  if (cached) {
-    try {
-      var json = JSON.parse(cached);
-      el.innerHTML = renderSection(json);
-      return;
-    } catch (e) {}
-  }
-
-  el.innerHTML = '<div class="loading"><div class="spinner"></div><span>Generating summary...</span></div>';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><span>Loading...</span></div>';
 
   try {
-    var json = await fetchFromAgent(queryId);
-    if (json) {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(json));
-      el.innerHTML = renderSection(json);
-    } else {
-      el.innerHTML = '<p class="empty-section">No structured summary returned.</p>';
-    }
+    var res = await fetch(SNOWFLAKE_URL + AGENT_PATH, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + PAT,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: [{ type: "text", text: q.question + SUMMARY_PROMPT }] }],
+        stream: false
+      })
+    });
+    if (!res.ok) throw new Error("API " + res.status);
+    var data = await res.json();
+    el.innerHTML = extractSection(data) || '<p>No summary available.</p>';
   } catch (err) {
-    if (err.name === 'AbortError') {
-      el.innerHTML = '<div class="loading"><div class="spinner"></div><span>Retrying...</span></div>';
-      retryOnce(el);
-    } else {
-      el.innerHTML = '<p class="error-text">Error: ' + esc(err.message) + '</p>';
-    }
+    el.innerHTML = '<p class="error-text">Error: ' + esc(err.message) + '</p>';
   }
 }
 
-async function fetchFromAgent(id) {
-  var q = QUERIES[id];
-  var controller = new AbortController();
-  var timeout = setTimeout(function() { controller.abort(); }, 180000);
-
-  var res = await fetch(SNOWFLAKE_URL + AGENT_PATH, {
-    method: "POST",
-    signal: controller.signal,
-    headers: {
-      "Authorization": "Bearer " + PAT,
-      "Content-Type": "application/json",
-      "Accept": "application/json"
-    },
-    body: JSON.stringify({
-      messages: [{ role: "user", content: [{ type: "text", text: q.question + SUMMARY_PROMPT }] }],
-      stream: false
-    })
-  });
-
-  clearTimeout(timeout);
-  if (!res.ok) throw new Error("API " + res.status);
-
-  var data = await res.json();
-  var raw = extractRaw(data);
-
+function extractSection(data) {
+  if (!data.content || !data.content.length) return '';
+  var textBlocks = [];
+  for (var i = 0; i < data.content.length; i++) {
+    if (data.content[i].type === 'text' && data.content[i].text) {
+      textBlocks.push(data.content[i].text);
+    }
+  }
+  if (textBlocks.length === 0) return '';
+  var raw = textBlocks[textBlocks.length - 1];
   try {
     var match = raw.match(/\{[\s\S]*\}/);
     if (match) {
       var json = JSON.parse(match[0]);
-      if (json.insights || json.risks || json.actions) return json;
+      var cfg = SECTION_CONFIG[section];
+      if (cfg && json[cfg.key]) {
+        return buildCard(cfg.title, json[cfg.key], cfg.bullet);
+      }
     }
   } catch (e) {}
-  return null;
-}
-
-async function retryOnce(el) {
-  try {
-    var json = await fetchFromAgent(queryId);
-    if (json) {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(json));
-      el.innerHTML = renderSection(json);
-    } else {
-      el.innerHTML = '<p class="empty-section">Summary unavailable. Please refresh the page.</p>';
-    }
-  } catch (e) {
-    el.innerHTML = '<p class="error-text">Summary unavailable. Please refresh the page.</p>';
-  }
-}
-
-function extractRaw(data) {
-  if (!data.content || !data.content.length) return '';
-  for (var i = data.content.length - 1; i >= 0; i--) {
-    if (data.content[i].type === 'text' && data.content[i].text) return data.content[i].text;
-  }
-  return '';
-}
-
-function renderSection(json) {
-  var cfg = SECTION_CONFIG[section];
-  if (!cfg) return '<p class="empty-section">Invalid section.</p>';
-  var items = json[cfg.key];
-  if (!items || items.length === 0) {
-    return '<div class="card"><div class="card-header"><span class="card-title">' + cfg.title + '</span></div><p class="empty-section">No ' + cfg.title.toLowerCase() + ' identified for this period.</p></div>';
-  }
-  return buildCard(cfg.title, items, cfg.bullet);
+  return '<p style="padding:16px;font-size:12px;color:#444;">' + esc(raw) + '</p>';
 }
 
 function buildCard(title, items, bulletCls) {
